@@ -1,0 +1,1 @@
+2025-10-11 17:43:08 /home/lihaoqian/myproject/SearchEngine/Make_dir/../include/cppjieba/DictTrie.hpp:203 FATAL exp: [ifs.is_open()] false. open ../include/dict/jieba.dict.utf8 failed.

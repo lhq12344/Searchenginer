@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+message ReqWordSuggest {
+    string searchword = 1;
+}
+
+message RespWordSuggest {
+    int32 code = 1;
+    string message = 2;
+    repeated string backwords = 3;  
+}
+
+service WordSuggestServer {
+    rpc WordSuggest(ReqWordSuggest) returns (RespWordSuggest) {}
+}
