@@ -1,1 +1,5 @@
-SearchEngine Server Start Failed!
+nohup: 忽略输入
+[WFREST] POST	/api/suggest
+[WFREST] GET	/api/search
+[WFREST] GET	/
+[WFREST] 2025-10-11 23:52:17 | 404 | 192.168.149.1 : 57569 | GET | "/" | -- 

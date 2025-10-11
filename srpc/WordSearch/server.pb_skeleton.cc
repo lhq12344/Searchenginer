@@ -28,19 +28,27 @@ public:
 		printf("Received searchword: %s\n", searchword.c_str());
 		// 拆分字符（对中文使用最大匹配法，优先匹配词典中的多字词）
 		vector<string> words;
-		auto is_lead_utf8 = [](unsigned char c)->int {
-			if ((c & 0x80) == 0) return 1;        // ASCII
-			if ((c & 0xE0) == 0xC0) return 2;      // 2-byte
-			if ((c & 0xF0) == 0xE0) return 3;      // 3-byte (most CJK)
-			if ((c & 0xF8) == 0xF0) return 4;      // 4-byte
-			return 1; // fallback
+		auto is_lead_utf8 = [](unsigned char c) -> int
+		{
+			if ((c & 0x80) == 0)
+				return 1; // ASCII
+			if ((c & 0xE0) == 0xC0)
+				return 2; // 2-byte
+			if ((c & 0xF0) == 0xE0)
+				return 3; // 3-byte (most CJK)
+			if ((c & 0xF8) == 0xF0)
+				return 4; // 4-byte
+			return 1;	  // fallback
 		};
 
 		// Helper to get a UTF-8 character substring at byte index i
-		auto utf8_char = [&](const string &s, size_t i)->pair<string, size_t> {
-			if (i >= s.size()) return {string(), 0};
+		auto utf8_char = [&](const string &s, size_t i) -> pair<string, size_t>
+		{
+			if (i >= s.size())
+				return {string(), 0};
 			int len = is_lead_utf8((unsigned char)s[i]);
-			if (i + len > s.size()) return {string(), 0};
+			if (i + len > s.size())
+				return {string(), 0};
 			return {s.substr(i, len), (size_t)len};
 		};
 
@@ -54,7 +62,8 @@ public:
 			for (int k = 0; k < MAX_WINDOW && j < searchword.size(); ++k)
 			{
 				auto p = utf8_char(searchword, j);
-				if (p.second == 0) break;
+				if (p.second == 0)
+					break;
 				chars.push_back(p);
 				j += p.second;
 			}
