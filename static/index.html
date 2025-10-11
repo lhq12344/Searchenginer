@@ -172,6 +172,9 @@
     }
 
     async function fetchSuggest(q, n = 8){
+      // Accept both server response shapes:
+      // 1) { code:0, backwords: ["a","b"] }
+      // 2) { code:0, data: { suggestions: [ { word:..., score... }, ... ] } }
       if(!q.trim()){ showSuggestions([]); return; }
       try{
         const body = new URLSearchParams();
@@ -183,11 +186,21 @@
           body: body.toString()
         });
         const j = await r.json();
-        if(j && j.code === 0 && j.data && Array.isArray(j.data.suggestions)){
-          showSuggestions(j.data.suggestions);
-        } else {
-          showSuggestions([]);
+        if(!j || j.code !== 0){ showSuggestions([]); return; }
+
+        // prefer top-level backwords (srpc server currently returns this)
+        if(Array.isArray(j.backwords)){
+          // normalize strings into objects for rendering convenience
+          showSuggestions(j.backwords.map(s => (typeof s === 'string' ? s : s)));
+          return;
         }
+
+        if(j.data && Array.isArray(j.data.suggestions)){
+          showSuggestions(j.data.suggestions);
+          return;
+        }
+
+        showSuggestions([]);
       }catch(e){ showSuggestions([]); }
     }
 

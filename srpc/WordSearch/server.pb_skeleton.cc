@@ -26,28 +26,75 @@ public:
 		// 获取用户请求
 		string searchword = request->searchword();
 		printf("Received searchword: %s\n", searchword.c_str());
-		// 拆分字符
+		// 拆分字符（对中文使用最大匹配法，优先匹配词典中的多字词）
 		vector<string> words;
+		auto is_lead_utf8 = [](unsigned char c)->int {
+			if ((c & 0x80) == 0) return 1;        // ASCII
+			if ((c & 0xE0) == 0xC0) return 2;      // 2-byte
+			if ((c & 0xF0) == 0xE0) return 3;      // 3-byte (most CJK)
+			if ((c & 0xF8) == 0xF0) return 4;      // 4-byte
+			return 1; // fallback
+		};
+
+		// Helper to get a UTF-8 character substring at byte index i
+		auto utf8_char = [&](const string &s, size_t i)->pair<string, size_t> {
+			if (i >= s.size()) return {string(), 0};
+			int len = is_lead_utf8((unsigned char)s[i]);
+			if (i + len > s.size()) return {string(), 0};
+			return {s.substr(i, len), (size_t)len};
+		};
+
+		// Max match window (in number of UTF-8 characters)
+		const int MAX_WINDOW = 3;
 		for (size_t i = 0; i < searchword.size();)
 		{
-			if (searchword[i] & 0x80)
-			{ // 中文字符
-				if (i + 3 <= searchword.size())
+			// read up to MAX_WINDOW utf8 chars into a vector
+			size_t j = i;
+			vector<pair<string, size_t>> chars;
+			for (int k = 0; k < MAX_WINDOW && j < searchword.size(); ++k)
+			{
+				auto p = utf8_char(searchword, j);
+				if (p.second == 0) break;
+				chars.push_back(p);
+				j += p.second;
+			}
+
+			bool matched = false;
+			// try longest match first
+			for (int w = (int)chars.size(); w > 0; --w)
+			{
+				string token;
+				size_t len_bytes = 0;
+				for (int t = 0; t < w; ++t)
 				{
-					words.push_back(searchword.substr(i, 3));
-					i += 3;
+					token += chars[t].first;
+					len_bytes += chars[t].second;
+				}
+				// if token exists in dict (we'll use readindist.dict for lookup via unordered_map later),
+				// here we check if invertedIndex contains token as a quick heuristic
+				if (readindist.invertedIndex.find(token) != readindist.invertedIndex.end())
+				{
+					words.push_back(token);
+					i += len_bytes;
+					matched = true;
+					break;
+				}
+			}
+			if (!matched)
+			{
+				// fallback to single utf8 char
+				if (!chars.empty())
+				{
+					words.push_back(chars[0].first);
+					i += chars[0].second;
 				}
 				else
 				{
+					// malformed utf8
 					response->set_code(1);
-					response->set_message("incomplete character");
+					response->set_message("invalid utf8 in searchword");
 					return;
 				}
-			}
-			else
-			{ // 英文字符
-				words.push_back(searchword.substr(i, 1));
-				i++;
 			}
 		}
 		// 查询索引，汇总结果
@@ -85,6 +132,7 @@ public:
 			if (count >= 10)
 				break;
 			response->add_backwords(kv.first); // 添加到响应中
+			printf("Suggested word: %s\n", kv.first.c_str());
 			count++;
 		}
 		while (count < 10)
@@ -100,24 +148,7 @@ public:
 void timerCallback(WFTimerTask *timertask)
 {
 	agent::Agent *pagent = (agent::Agent *)timertask->user_data;
-	if (!pagent)
-	{
-		// No consul agent available, skip heartbeat
-		return;
-	}
-	try
-	{
-		// Use the same service id we registered
-		pagent->servicePass("WordSuggestService1");
-	}
-	catch (const ppconsul::NotFoundError &e)
-	{
-		fprintf(stderr, "Consul NotFoundError in servicePass: %s\n", e.what());
-	}
-	catch (const std::exception &e)
-	{
-		fprintf(stderr, "Consul error in servicePass: %s\n", e.what());
-	}
+	pagent->servicePass("WordSuggestService1");
 	WFTimerTask *nextTask = WFTaskFactory::create_timer_task(9, 0, timerCallback);
 	nextTask->user_data = pagent;
 	series_of(timertask)->push_back(nextTask);
@@ -136,79 +167,30 @@ int main()
 	// 向consul注册服务（受保护，避免未捕获异常导致进程中止）
 	agent::Agent *pagent = nullptr;
 	Consul *pconsul = nullptr; // keep consul alive for the lifetime of agent
-	try
+	pconsul = new Consul("127.0.0.1:8500", ppconsul::kw::dc = "dc1");
+	pagent = new agent::Agent(*pconsul);
+	pagent->registerService(
+		agent::kw::name = "WordSuggestService1",
+		agent::kw::id = "WordSuggestService1",
+		agent::kw::address = "127.0.0.1",
+		agent::kw::port = port,
+		agent::kw::check = agent::TtlCheck(std::chrono::seconds(10)));
+	// mark service passing once
+	pagent->servicePass("WordSuggestService1");
+	// 注册定时心跳函数
+	WFTimerTask *timerTask = WFTaskFactory::create_timer_task(9, 0, timerCallback);
+	if (timerTask)
 	{
-		pconsul = new Consul("127.0.0.1:8500", ppconsul::kw::dc = "dc1");
-		pagent = new agent::Agent(*pconsul);
-		pagent->registerService(
-			agent::kw::name = "WordSuggestService1",
-			agent::kw::id = "WordSuggestService1",
-			agent::kw::address = "127.0.0.1",
-			agent::kw::port = port,
-			agent::kw::check = agent::TtlCheck(std::chrono::seconds(10)));
-		// mark service passing once
-		pagent->servicePass("WordSuggestService1");
-		// 注册定时心跳函数
-		WFTimerTask *timerTask = WFTaskFactory::create_timer_task(9, 0, timerCallback);
-		if (timerTask)
-		{
-			timerTask->user_data = pagent;
-			timerTask->start();
-		}
-		else
-		{
-			fprintf(stderr, "Failed to create timer task for consul heartbeat\n");
-		}
+		timerTask->user_data = pagent;
+		timerTask->start();
 	}
-	catch (const ppconsul::NotFoundError &e)
+	else
 	{
-		fprintf(stderr, "Consul NotFoundError while registering service: %s\n", e.what());
-		if (pagent)
-		{
-			delete pagent;
-			pagent = nullptr;
-		}
-		if (pconsul)
-		{
-			delete pconsul;
-			pconsul = nullptr;
-		}
-	}
-	catch (const std::exception &e)
-	{
-		fprintf(stderr, "Consul error while registering service: %s\n", e.what());
-		if (pagent)
-		{
-			delete pagent;
-			pagent = nullptr;
-		}
+		fprintf(stderr, "Failed to create timer task for consul heartbeat\n");
 	}
 	server.start(port);
 	wait_group.wait();
 	server.stop();
-	if (pagent)
-	{
-		// best-effort cleanup
-		try
-		{
-			delete pagent;
-		}
-		catch (...)
-		{
-		}
-		pagent = nullptr;
-	}
-	if (pconsul)
-	{
-		try
-		{
-			delete pconsul;
-		}
-		catch (...)
-		{
-		}
-		pconsul = nullptr;
-	}
 	google::protobuf::ShutdownProtobufLibrary();
 	return 0;
 }

@@ -51,11 +51,17 @@ void SearchEngineServer::loadKeywordSearchModule()
 						}
 						// 从consul中获取服务的ip&port
 						std::string url = "http://192.168.149.128:8500/v1/agent/services";
-						std::string ip;
-						unsigned short port;
 						WFHttpTask *consultask = WFTaskFactory::create_http_task(
 							url, 0, 3,
-							std::bind(ConsulWordSearchCallback, std::placeholders::_1, std::ref(ip),
-									std::ref(port), req, resp, series));
+							std::bind(ConsulWordSearchCallback, std::placeholders::_1,
+									  req, resp, series));
 						series->push_back(consultask); });
+}
+
+// 占位：网页搜索模块的简单实现，避免链接时未定义符号
+void SearchEngineServer::loadWebPageSearchModule()
+{
+	// 暂时不提供真实网页抓取/索引，只返回 501 给 web 请求（如果未来实现可替换）
+	_httpserver.GET("/api/search", [](const HttpReq *req, HttpResp *resp)
+					{ resp->String("{\"code\":501, \"message\": \"Not Implemented\"}"); });
 }

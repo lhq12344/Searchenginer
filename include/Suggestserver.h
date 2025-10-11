@@ -13,7 +13,8 @@ using namespace wfrest;
 using namespace protocol;
 using json = nlohmann::json;
 
-void ConsulWordSearchCallback(WFHttpTask *task, std::string &ip,
-							  unsigned short &port, const HttpReq *req,
+// Note: do NOT pass stack references (ip/port) into the async callback.
+// The callback will parse consul's response and create its own local ip/port.
+void ConsulWordSearchCallback(WFHttpTask *task, const HttpReq *req,
 							  HttpResp *resp, SeriesWork *series);
 #endif // !SUGGESTSERVER_H

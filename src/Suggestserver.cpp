@@ -31,8 +31,7 @@ void wordSuggestCallback(RespWordSuggest *response, srpc::RPCContext *ctx, HttpR
 }
 
 // 访问CONSUL获取服务信息
-void ConsulWordSearchCallback(WFHttpTask *task, std::string &ip,
-							  unsigned short &port, const HttpReq *req,
+void ConsulWordSearchCallback(WFHttpTask *task, const HttpReq *req,
 							  HttpResp *resp, SeriesWork *series)
 {
 	auto consul_resp = task->get_resp();
@@ -52,6 +51,8 @@ void ConsulWordSearchCallback(WFHttpTask *task, std::string &ip,
 				auto j = json::parse(json_candidate);
 				// Consul 的返回格式是一个对象，key 是服务名
 
+				std::string ip;
+				unsigned short port = 0;
 				for (auto &[serviceName, serviceInfo] : j.items())
 				{
 					if (serviceName == "WordSuggestService1" &&
