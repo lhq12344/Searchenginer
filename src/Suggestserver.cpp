@@ -1,5 +1,34 @@
 #include "../include/Suggestserver.h"
 
+// URL解码函数
+std::string urlDecode(const std::string &encoded)
+{
+	std::string decoded;
+	for (size_t i = 0; i < encoded.size(); ++i)
+	{
+		if (encoded[i] == '%' && i + 2 < encoded.size())
+		{
+			// 解析%后面的两位十六进制数
+			char hex1 = encoded[i + 1];
+			char hex2 = encoded[i + 2];
+
+			int val = 0;
+			if (isxdigit(hex1) && isxdigit(hex2))
+			{
+				std::stringstream ss;
+				ss << std::hex << std::string(1, hex1) << std::string(1, hex2);
+				ss >> val;
+				decoded += static_cast<char>(val);
+				i += 2; // 跳过已经处理的两个字符
+				continue;
+			}
+		}
+		// 普通字符直接添加
+		decoded += encoded[i];
+	}
+	return decoded;
+}
+
 void wordSuggestCallback(RespWordSuggest *response, srpc::RPCContext *ctx, HttpResp *resp,
 						 ReqWordSuggest *word_suggest_req)
 {
@@ -14,6 +43,7 @@ void wordSuggestCallback(RespWordSuggest *response, srpc::RPCContext *ctx, HttpR
 		for (int i = 0; i < response->backwords_size(); ++i)
 		{
 			j["backwords"].push_back(response->backwords(i));
+			printf("Suggested word: %s\n", response->backwords(i).c_str());
 		}
 		resp->String(j.dump());
 	}
@@ -73,13 +103,14 @@ void ConsulWordSearchCallback(WFHttpTask *task, const HttpReq *req,
 
 				std::cout << "IP: " << ip << ", Port: " << port << std::endl;
 				auto formKV = req->form_kv();
-				std::string searchword = formKV["searchword"];
+				std::string urlsearchword = formKV["searchword"];
+				std::string searchword = urlDecode(urlsearchword);
 				if (searchword.empty())
 				{
 					resp->String("FAILED: searchword is empty");
 					return;
 				}
-				std::cout << "searchword: " << searchword << std::endl;
+				std::cout << "searchword: " << searchword.c_str() << std::endl;
 				GOOGLE_PROTOBUF_VERIFY_VERSION;
 				// 1) 建立 SRPC Client（放到堆或让 task 管理其生命周期）
 				auto client =
@@ -88,6 +119,7 @@ void ConsulWordSearchCallback(WFHttpTask *task, const HttpReq *req,
 				// 2) 组装请求
 				auto *word_suggest_req = new ReqWordSuggest();
 				word_suggest_req->set_searchword(searchword);
+
 				// 3) 创建一个 SRPC 任务，并把它挂到当前 HTTP 的 series 上
 				auto *task = client->create_WordSuggest_task(
 					std::bind(wordSuggestCallback, std::placeholders::_1,

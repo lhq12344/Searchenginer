@@ -151,9 +151,11 @@
       btnClear: document.getElementById('btnClear'),
     };
 
-    let sugIndex = -1; // keyboard focus
-    let suggestions = [];
-    let debounceTimer = 0;
+  let sugIndex = -1; // keyboard focus
+  let suggestions = [];
+  let debounceTimer = 0;
+  // 标记是否处于 IME 合成（输入法拼写）阶段
+  let isComposing = false;
 
     function showSuggestions(list){
       suggestions = list || [];
@@ -230,7 +232,22 @@
     }
 
     // events
+    // 在输入法合成期间不要触发建议请求（会发送不完整拼音）
+    els.q.addEventListener('compositionstart', () => {
+      isComposing = true;
+    });
+
+    els.q.addEventListener('compositionend', (e) => {
+      // 合成结束，标记结束并立即请求一次建议（合成后的字符已提交）
+      isComposing = false;
+      // 有些浏览器在 compositionend 后会跟一个 input 事件，但为了确保立刻响应我们主动触发
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(()=> fetchSuggest(els.q.value), 0);
+    });
+
     els.q.addEventListener('input', () => {
+      // 如果正在合成（按拼音还没选字），不要触发远程建议
+      if (isComposing) return;
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(()=> fetchSuggest(els.q.value), 160);
     });
@@ -242,6 +259,8 @@
       } else if(e.key === 'ArrowUp'){
         sugIndex = Math.max(-1, sugIndex-1); updateActive(); e.preventDefault();
       } else if(e.key === 'Enter'){
+        // 如果正在合成（输入法），忽略回车的搜索触发，等待 compositionend
+        if (isComposing) return;
         if(sugIndex>=0 && suggestions[sugIndex]){
           els.q.value = suggestions[sugIndex].word || suggestions[sugIndex];
         }

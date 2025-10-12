@@ -5,73 +5,141 @@ bool ReadIndist::LoadDictAndIndex()
 {
 	int ret = 0;
 	// 读取词典和索引文件
-	if (!ReadDict(DICT_FILE))
+	if (!ENReadDict(EN_DICT_FILE))
 	{
 		cerr << "Failed to read English dictionary." << endl;
 		ret = -1;
 	}
 
-	if (!ReadInvertedIndex(INDEX_FILE))
+	if (!CNReadDict(CN_DICT_FILE))
+	{
+		cerr << "Failed to read Chinese dictionary." << endl;
+		ret = -1;
+	}
+
+	if (!ENReadInvertedIndex(EN_INDEX_FILE))
 	{
 		cerr << "Failed to read English inverted index." << endl;
+		ret = -1;
+	}
+
+	if (!CNReadInvertedIndex(CN_INDEX_FILE))
+	{
+		cerr << "Failed to read Chinese inverted index." << endl;
 		ret = -1;
 	}
 
 	return ret == 0;
 }
 // 读取词典文件
-bool ReadIndist::ReadDict(const std::vector<std::string> &dictPaths)
+bool ReadIndist::ENReadDict(const std::string &dictPaths)
 {
-	for (const auto &path : dictPaths)
+
+	printf("Loading dictionary from: %s\n", dictPaths.c_str());
+	ifstream dictFile(dictPaths);
+	if (!dictFile.is_open())
 	{
-		ifstream dictFile(path);
-		if (!dictFile.is_open())
+		cerr << "[Error] 打开词典文件失败: " << dictPaths << " (请确认文件存在且有读权限)\n";
+		return false;
+	}
+	string line;
+	while (getline(dictFile, line))
+	{
+		auto pos = line.find(' ');
+		if (pos != string::npos)
 		{
-			cerr << "[Error] 打开词典文件失败: " << path << " (请确认文件存在且有读权限)\n";
-			return false;
-		}
-		string line;
-		while (getline(dictFile, line))
-		{
-			auto pos = line.find(' ');
-			if (pos != string::npos)
-			{
-				string word = line.substr(0, pos);
-				int freq = stoi(line.substr(pos + 1));
-				dict.emplace_back(word, freq);
-			}
+			string word = line.substr(0, pos);
+			int freq = stoi(line.substr(pos + 1));
+			ENdict.emplace_back(word, freq);
 		}
 	}
+
 	return true;
 }
 
-// 读取倒排索引文件
-bool ReadIndist::ReadInvertedIndex(const std::vector<std::string> &indexPaths)
+bool ReadIndist::CNReadDict(const std::string &dictPaths)
 {
-	for (const auto &path : indexPaths)
+
+	printf("Loading dictionary from: %s\n", dictPaths.c_str());
+	ifstream dictFile(dictPaths);
+	if (!dictFile.is_open())
 	{
-		ifstream dictFile(path);
-		if (!dictFile.is_open())
+		cerr << "[Error] 打开词典文件失败: " << dictPaths << " (请确认文件存在且有读权限)\n";
+		return false;
+	}
+	string line;
+	while (getline(dictFile, line))
+	{
+		auto pos = line.find(' ');
+		if (pos != string::npos)
 		{
-			cerr << "[Error] 打开倒排索引文件失败: " << path << " (请确认文件存在且有读权限)\n";
-			return false;
+			string word = line.substr(0, pos);
+			int freq = stoi(line.substr(pos + 1));
+			CNdict.emplace_back(word, freq);
 		}
-		string line;
-		while (getline(dictFile, line))
+	}
+
+	return true;
+}
+// 读取倒排索引文件
+bool ReadIndist::ENReadInvertedIndex(const std::string &indexPaths)
+{
+
+	printf("Loading inverted index from: %s\n", indexPaths.c_str());
+	ifstream dictFile(indexPaths);
+	if (!dictFile.is_open())
+	{
+		cerr << "[Error] 打开倒排索引文件失败: " << indexPaths << " (请确认文件存在且有读权限)\n";
+		return false;
+	}
+	string line;
+	while (getline(dictFile, line))
+	{
+		auto pos = line.find(' ');
+		if (pos != string::npos)
 		{
-			auto pos = line.find(' ');
-			if (pos != string::npos)
+			string word = line.substr(0, pos);
+			// printf("Indexing word: %s\n", word.c_str());
+			string rest = line.substr(pos + 1);
+			istringstream iss(rest);
+			int docid;
+			while (iss >> docid)
 			{
-				string word = line.substr(0, pos);
-				string rest = line.substr(pos + 1);
-				istringstream iss(rest);
-				int docid;
-				while (iss >> docid)
-				{
-					invertedIndex[word].insert(docid);
-				}
+				ENinvertedIndex[word].insert(docid);
 			}
 		}
 	}
+
+	return true;
+}
+
+bool ReadIndist::CNReadInvertedIndex(const std::string &indexPaths)
+{
+
+	printf("Loading inverted index from: %s\n", indexPaths.c_str());
+	ifstream dictFile(indexPaths);
+	if (!dictFile.is_open())
+	{
+		cerr << "[Error] 打开倒排索引文件失败: " << indexPaths << " (请确认文件存在且有读权限)\n";
+		return false;
+	}
+	string line;
+	while (getline(dictFile, line))
+	{
+		auto pos = line.find(' ');
+		if (pos != string::npos)
+		{
+			string word = line.substr(0, pos);
+			// printf("Indexing word: %s\n", word.c_str());
+			string rest = line.substr(pos + 1);
+			istringstream iss(rest);
+			int docid;
+			while (iss >> docid)
+			{
+				CNinvertedIndex[word].insert(docid);
+			}
+		}
+	}
+
 	return true;
 }
