@@ -12,7 +12,8 @@
 
 				srpc微服务指令	：srpc_generator protobuf wordsearch.proto . 
 								protoc -I. --srpc_out=. wordsearch.proto
-
+	3.细节总结：
+		1）
 
 	========================
 	前端静态页面与 API 规范
@@ -22,7 +23,7 @@
 	直接在浏览器打开或由服务端映射为静态资源目录。
 
 	1) 关键词推荐 API
-		 方法: GET /api/suggest?q=<string>&n=<int>
+		 方法:POST /api/suggest?q=<string>&n=<int>
 		 返回:
 		 {
 			 "code": 0,
@@ -38,7 +39,7 @@
 		 { "code": 非0, "msg": "错误信息" }
 
 	2) 网页查询 API
-		 方法: GET /api/search?q=<string>&page=<int>&size=<int>
+		 方法: POST /api/search?q=<string>&page=<int>&size=<int>
 		 返回:
 		 {
 			 "code": 0,

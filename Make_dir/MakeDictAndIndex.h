@@ -17,9 +17,19 @@ static string ENfilepath[] = {
 };
 
 static string CNfilepath[] = {
-	{"yuliao/C3-Art0002.txt"},
-	{"yuliao/C3-Art0003.txt"},
-	{"yuliao/C3-Art0005.txt"},
+	{"yuliao/art/C3-Art0002.txt"},
+	{"yuliao/art/C3-Art0003.txt"},
+	{"yuliao/art/C3-Art0005.txt"},
+	{"yuliao/art/C3-Art0007.txt"},
+	{"yuliao/art/C3-Art0009.txt"},
+	{"yuliao/art/C3-Art00011.txt"},
+	{"yuliao/art/C3-Art00013.txt"},
+	{"yuliao/art/C3-Art00015.txt"},
+	{"yuliao/art/C3-Art00017.txt"},
+	{"yuliao/art/C3-Art00019.txt"},
+	{"yuliao/art/C3-Art00021.txt"},
+	{"yuliao/art/C3-Art00023.txt"},
+	{"yuliao/art/C3-Art00025.txt"},
 };
 
 static string ENStopWordsfilepath[] = {

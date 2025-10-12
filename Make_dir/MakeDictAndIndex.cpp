@@ -148,9 +148,11 @@ void MakeDictAndIndex::makeCNdict()
 			cn_stopset.insert(t);
 	}
 	// 读取中文语料库
-	for (const auto &filepath : CNfilepath)
+	// 打开中文语料目录
+	namespace fs = std::filesystem;
+	for (const auto &entry : fs::directory_iterator("yuliao/art"))
 	{
-		ifstream file(filepath);
+		ifstream file(entry.path());
 		string line;
 		while (getline(file, line))
 		{
