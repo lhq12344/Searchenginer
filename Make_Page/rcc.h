@@ -14,6 +14,7 @@ using std::vector;
 
 using namespace tinyxml2;
 using namespace simhash;
+class MakePage;
 
 struct RSSIteam
 {
@@ -28,6 +29,8 @@ class RSS
 public:
 	RSS(size_t capa);
 
+	vector<RSSIteam> _rss;
+	size_t idex = 0;
 	// 读xml文件并且清洗
 	void read(const string &filename);
 
@@ -39,8 +42,7 @@ private:
 						"./include/simhash/dict/hmm_model.utf8",
 						"./include/simhash/dict/idf.utf8",
 						"./include/simhash/dict/stop_words.utf8"};
-	size_t idex = 0;
+
 	size_t start = 0;
-	vector<RSSIteam> _rss;
 	unordered_map<int, uint64_t> simhashIndex; //  文档 ID 列表 -> simhash 值
 };
