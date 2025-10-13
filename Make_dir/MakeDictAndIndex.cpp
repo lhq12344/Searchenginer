@@ -73,7 +73,7 @@ vector<string> MakeDictAndIndex::CNcut(const string &line)
 void MakeDictAndIndex::makeENdict()
 {
 	// 确保输出目录存在
-	std::error_code __ec1;
+	std::error_code __ec1; //// 用于接收错误码
 	std::filesystem::create_directories("dict", __ec1);
 
 	// 读取英文停用词（trim + 去BOM + 小写归一化）
@@ -131,6 +131,7 @@ void MakeDictAndIndex::makeCNdict()
 	// 确保输出目录存在
 	std::error_code __ec2;
 	std::filesystem::create_directories("dict", __ec2);
+
 	// 读取中文停用词（trim + 去BOM）
 	std::unordered_set<std::string> cn_stopset;
 	ifstream stopWordsFile(CNStopWordsfilepath[0]);

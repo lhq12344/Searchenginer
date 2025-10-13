@@ -73,6 +73,9 @@
 		"typeinfo": "cpp",
 		"valarray": "cpp",
 		"variant": "cpp",
-		"list": "cpp"
+		"list": "cpp",
+		"filesystem": "cpp",
+		"bitset": "cpp",
+		"regex": "cpp"
 	}
 }

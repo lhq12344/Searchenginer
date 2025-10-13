@@ -12,8 +12,11 @@
 
 				srpc微服务指令	：srpc_generator protobuf wordsearch.proto . 
 								protoc -I. --srpc_out=. wordsearch.proto
-	3.细节总结：
-		1）
+二.网页查询
+	1.离线部分：创建网页搜索库和网页偏移库
+				细节：网页清洗
+					网页去重（simhasher）
+	2.在线部分：
 
 	========================
 	前端静态页面与 API 规范

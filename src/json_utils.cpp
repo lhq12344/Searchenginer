@@ -1,6 +1,7 @@
 #include "json_utils.h"
 #include <string>
 
+// 在一段字符串中提取出第一个完整的 JSON 对象或数组（{...} 或 [...]）。
 std::string extract_first_json(const std::string &s)
 {
 	size_t p = s.find_first_of("{[");
