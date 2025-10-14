@@ -14,7 +14,7 @@ message ReqPageSuggest {
 message RespPageSuggest {
     int32 code = 1;
     string message = 2;
-    repeated Item item = 3;  
+    repeated Item_proto itemproto = 3;  
 }
 
 service PageSuggestServer {

@@ -116,10 +116,24 @@ public:
 				printf("Invalid docid: %d\n", docid);
 				continue; // docid 无效
 			}
-			const Item &page = readPage.pageLib[docid];
-			Item *item1 = response->add_item();
-			item1->set_title(page.title);
-			item1->set_link(page.link);
+			const Item &page = readPage.pageLib[docid - 1];
+			pair<int, int> offset = readPage.offsetLib[docid - 1];
+			ifstream ifs("../../Make_Page/page/text.dat", ios::binary);
+			if (!ifs)
+			{
+				response->set_code(1);
+				response->set_message("Failed to open text.dat");
+				printf("Failed to open text.dat\n");
+				break;
+			}
+			size_t len = offset.second - offset.first;
+			ifs.seekg(offset.first);
+			string buffer(len, '\0'); // 预分配空间
+			ifs.read(&buffer[0], len);
+			Item_proto *item_proto = response->add_itemproto();
+			item_proto->set_title(page.title);
+			item_proto->set_link(page.link);
+			item_proto->set_description(buffer);
 			printf("DocID: %d, Title: %s, Link: %s,Similarity: %f\n", docid, page.title.c_str(), page.link.c_str(), item.first);
 			count++;
 		}
