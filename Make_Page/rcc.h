@@ -14,7 +14,6 @@ using std::vector;
 
 using namespace tinyxml2;
 using namespace simhash;
-class MakePage;
 
 struct RSSIteam
 {

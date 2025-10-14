@@ -155,7 +155,6 @@ void RSS::store(const string &filename, const string &storeFile, const string &o
 
 		// 记录偏移量
 		offsetofs
-			<< idex + 1 << " "
 			<< start << " "
 			<< item._description.size() + start << " "; // 记录 docid、起始偏移量、结束偏移量
 		offsetofs << '\n';

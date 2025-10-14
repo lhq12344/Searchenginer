@@ -1,5 +1,6 @@
 #include "../include/Search_Engine_Server.h"
 #include "../include/Suggestserver.h"
+#include "../include/Pageserver.h"
 #include <ppconsul/ppconsul.h>
 #include <string>
 
@@ -42,8 +43,7 @@ void SearchEngineServer::loadStaticResourceModule()
 // 关键词搜索功能
 void SearchEngineServer::loadKeywordSearchModule()
 {
-	_httpserver.POST("/api/suggest", [](const HttpReq *req, HttpResp *resp,
-										SeriesWork *series)
+	_httpserver.POST("/api/suggest", [](const HttpReq *req, HttpResp *resp, SeriesWork *series)
 					 {
 						if (req->content_type() != APPLICATION_URLENCODED) {
 						resp->String("Content-Type must be application/x-www-form-urlencoded");
@@ -62,6 +62,17 @@ void SearchEngineServer::loadKeywordSearchModule()
 void SearchEngineServer::loadWebPageSearchModule()
 {
 	// 暂时不提供真实网页抓取/索引，只返回 501 给 web 请求（如果未来实现可替换）
-	_httpserver.GET("/api/search", [](const HttpReq *req, HttpResp *resp)
-					{ resp->String("{\"code\":501, \"message\": \"Not Implemented\"}"); });
+	_httpserver.POST("/api/search", [](const HttpReq *req, HttpResp *resp, SeriesWork *series)
+					 {
+						if (req->content_type() != APPLICATION_URLENCODED) {
+						resp->String("Content-Type must be application/x-www-form-urlencoded");
+						return;
+						}
+						// 从consul中获取服务的ip&port
+						std::string url = "http://192.168.149.128:8500/v1/agent/services";
+						WFHttpTask *consultask = WFTaskFactory::create_http_task(
+							url, 0, 3,
+							std::bind(ConsulPageSearchCallback, std::placeholders::_1,
+									  req, resp, series));
+						series->push_back(consultask); });
 }

@@ -9,11 +9,8 @@
 #include <vector>
 #include <unordered_map>
 #include <set>
-#include <algorithm>
-#include <regex>
 #include <filesystem>
-#include <sstream>
-#include <cctype>
+
 using namespace std;
 
 class MakePage

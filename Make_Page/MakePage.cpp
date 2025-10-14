@@ -91,7 +91,7 @@ void MakePage::makeinverseindex()
 		ofs << word << "\t";
 		for (const auto &docWeight : docWeights)
 		{
-			ofs << "(" << docWeight.first << ", " << docWeight.second << ") ";
+			ofs << docWeight.first << ", " << docWeight.second;
 		}
 		ofs << endl;
 	}

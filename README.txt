@@ -11,7 +11,7 @@
 				接下来使用最短编辑距离算法找到最大相似度的n个结果并且返回json
 
 				srpc微服务指令	：srpc_generator protobuf wordsearch.proto . 
-								protoc -I. --srpc_out=. wordsearch.proto
+								protoc -I. --cpp_out=. pagesearch.proto 2>&1 | sed -n '1,200p'
 二.网页查询
 	1.离线部分：创建网页搜索库和网页偏移库
 				细节：网页清洗

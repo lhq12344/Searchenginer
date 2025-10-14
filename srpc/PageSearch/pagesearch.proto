@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+// 使用 message 替代 struct 定义数据结构
+message Item_proto {
+    string title = 1;      
+    string link = 2;
+    string description = 3;
+}
+
+message ReqPageSuggest {
+    string searchstring = 1;
+}
+
+message RespPageSuggest {
+    int32 code = 1;
+    string message = 2;
+    repeated Item item = 3;  
+}
+
+service PageSuggestServer {
+    rpc PageSuggest(ReqPageSuggest) returns (RespPageSuggest) {}
+}
