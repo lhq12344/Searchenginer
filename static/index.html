@@ -247,7 +247,7 @@
           const title = item.title || item.url || item.link || '';
           const href = item.link || item.url || '#';
           const desc = item.description || item.snippet || '';
-          const preview = desc.length > 20 ? desc.slice(0,20) + '...' : desc;
+          const preview = truncateByChars(desc, 100);
           return `
             <div class="result">
               <a class="title" href="${escapeHtml(href)}" target="_blank" rel="noreferrer">${escapeHtml(title)}</a>
@@ -345,6 +345,13 @@
       els.results.innerHTML = '';
       els.q.focus();
     });
+
+    // 按 Unicode 码点安全截断，避免切断汉字/emoji
+    function truncateByChars(input, limit){
+      const arr = Array.from(String(input || ''));
+      if(arr.length <= (limit||0)) return arr.join('');
+      return arr.slice(0, limit).join('') + '...';
+    }
 
     // 如果 URL 上有 ?q=，自动搜索
     const urlQ = new URLSearchParams(location.search).get('q');
