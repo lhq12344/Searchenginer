@@ -1,33 +1,6 @@
 #include "../include/Suggestserver.h"
 
-// URL解码函数
-std::string urlDecode(const std::string &encoded)
-{
-	std::string decoded;
-	for (size_t i = 0; i < encoded.size(); ++i)
-	{
-		if (encoded[i] == '%' && i + 2 < encoded.size())
-		{
-			// 解析%后面的两位十六进制数
-			char hex1 = encoded[i + 1];
-			char hex2 = encoded[i + 2];
-
-			int val = 0;
-			if (isxdigit(hex1) && isxdigit(hex2))
-			{
-				std::stringstream ss;
-				ss << std::hex << std::string(1, hex1) << std::string(1, hex2);
-				ss >> val;
-				decoded += static_cast<char>(val);
-				i += 2; // 跳过已经处理的两个字符
-				continue;
-			}
-		}
-		// 普通字符直接添加
-		decoded += encoded[i];
-	}
-	return decoded;
-}
+#include "../include/Utils.h"
 
 void wordSuggestCallback(RespWordSuggest *response, srpc::RPCContext *ctx, HttpResp *resp,
 						 ReqWordSuggest *word_suggest_req)

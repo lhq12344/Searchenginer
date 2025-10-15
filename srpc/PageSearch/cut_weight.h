@@ -2,7 +2,7 @@
 #define CUT_WEIGHT_H
 
 #include "../include/cppjieba/Jieba.hpp"
-#include "rcc.h"
+#include "ReadPage.h"
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -18,7 +18,7 @@ class CutWeight
 public:
 	CutWeight() = default;
 	~CutWeight() = default;
-	vector<pair<string, double>> cut_weight(const string &str);
+	vector<pair<string, double>> cut_weight(const string &str, int N, ReadPage &readPage);
 	double get_norm() const { return norm; }
 
 private:

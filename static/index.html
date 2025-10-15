@@ -211,21 +211,51 @@
       els.sugBox.style.display = 'none';
       els.results.innerHTML = '<div class="result">正在搜索…</div>';
       try{
-        const r = await fetch(API.search(q));
+        // Submit as POST form to match server which expects application/x-www-form-urlencoded
+        const body = new URLSearchParams();
+        body.append('searchstring', q);
+        const r = await fetch('/api/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: body.toString()
+        });
         const j = await r.json();
-        if(!(j && j.code===0 && j.data)) throw new Error(j && j.msg || '搜索失败');
-        const { items = [], total = 0 } = j.data;
+
+        // 支持两种后端响应形态：
+        // 1) { code:0, data: { items: [ { title, url, snippet }, ... ], total } }
+        // 2) { code:0, items: [ { title, link, description }, ... ] }
+        let items = [];
+        let total = 0;
+        if(j && j.code === 0){
+          if(j.data && Array.isArray(j.data.items)){
+            items = j.data.items;
+            total = j.data.total || items.length;
+          }else if(Array.isArray(j.items)){
+            items = j.items;
+            total = items.length;
+          }
+        }else{
+          throw new Error(j && j.msg || '搜索失败');
+        }
+
         if(items.length===0){
           els.results.innerHTML = `<div class="result">未找到与“${escapeHtml(q)}”相关的结果。</div>`;
           return;
         }
-        els.results.innerHTML = items.map(item=>`
-          <div class="result">
-            <a class="title" href="${item.url}" target="_blank" rel="noreferrer">${escapeHtml(item.title||item.url)}</a>
-            <div class="meta">${escapeHtml(item.url||'')}</div>
-            <div class="snippet">${escapeHtml(item.snippet||'')}</div>
-          </div>`).join('') +
-          `<div class="footer">共 ${total} 条结果</div>`;
+
+        els.results.innerHTML = items.map(item=>{
+          const title = item.title || item.url || item.link || '';
+          const href = item.link || item.url || '#';
+          const desc = item.description || item.snippet || '';
+          const preview = desc.length > 20 ? desc.slice(0,20) + '...' : desc;
+          return `
+            <div class="result">
+              <a class="title" href="${escapeHtml(href)}" target="_blank" rel="noreferrer">${escapeHtml(title)}</a>
+              <div class="meta">${escapeHtml(href)}</div>
+              <div class="snippet">${escapeHtml(preview)}</div>
+            </div>`;
+        }).join('') + `<div class="footer">共 ${total} 条结果</div>`;
+
       }catch(e){
         els.results.innerHTML = `<div class="result">错误：${escapeHtml(e.message||String(e))}</div>`;
       }

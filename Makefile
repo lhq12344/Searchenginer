@@ -31,8 +31,8 @@ LDLIBS   += -lprotobuf -lsrpc -lppconsul -llz4 -lsnappy
 
 # Collect app sources and only the protobuf .pb.cc from srpc folder (avoid skeleton mains)
 APP_SOURCES := $(wildcard $(SRC_DIR)/*.cpp $(SRC_DIR)/*.cc)
-SRPC_PB_SRC := srpc/WordSearch/wordsearch.pb.cc
-SOURCES := $(APP_SOURCES) $(SRPC_PB_SRC)
+SRPC_PB_SRC := $(wildcard srpc/*/*.pb.cc)
+SOURCES := $(sort $(APP_SOURCES) $(SRPC_PB_SRC) src/Utils.cpp)
 
 # Map sources to build/NAME.o using basename/notdir to handle paths like srpc/WordSearch/wordsearch.pb.cc
 OBJECTS := $(foreach f,$(SOURCES),$(BUILD_DIR)/$(basename $(notdir $(f))).o)
@@ -53,8 +53,14 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | dirs
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cc | dirs
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/wordsearch.pb.o: srpc/WordSearch/wordsearch.pb.cc | dirs
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+# Rule: compile srpc/*/NAME.pb.cc -> build/NAME.pb.o
+$(BUILD_DIR)/%.pb.o:
+	@srcfile=$(shell echo srpc/*/$*.pb.cc); \
+	if [ -f $$srcfile ]; then \
+		$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $$srcfile -o $@; \
+	else \
+		echo "No source for $@ (tried $$srcfile)"; exit 1; \
+	fi
 
 run: all
 	$(TARGET)

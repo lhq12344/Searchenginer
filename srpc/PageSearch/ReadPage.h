@@ -33,7 +33,7 @@ public:
 
 	// 加载网页库、偏移库、倒排索引到内存
 	bool LoadPageAndOffset();
-
+	int totalpage = 0;
 	// 网页库
 	std::vector<Item> pageLib;
 

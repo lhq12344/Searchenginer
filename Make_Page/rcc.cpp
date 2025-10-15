@@ -109,6 +109,39 @@ void RSS::store(const string &filename, const string &storeFile, const string &o
 	}
 
 	// 通过simhash进行去重
+	// 写入 XML 根元素开始
+	ofs << "<root>" << '\n';
+
+	auto xml_escape = [](const std::string &s) -> std::string
+	{
+		std::string out;
+		out.reserve(s.size());
+		for (char c : s)
+		{
+			switch (c)
+			{
+			case '&':
+				out += "&amp;";
+				break;
+			case '<':
+				out += "&lt;";
+				break;
+			case '>':
+				out += "&gt;";
+				break;
+			case '"':
+				out += "&quot;";
+				break;
+			case '\'':
+				out += "&apos;";
+				break;
+			default:
+				out.push_back(c);
+			}
+		}
+		return out;
+	};
+
 	for (const auto &item : _rss)
 	{
 		size_t topN = 10; // 取前 10 个关键词
@@ -144,26 +177,23 @@ void RSS::store(const string &filename, const string &storeFile, const string &o
 		}
 		simhashIndex[idex + 1] = u64; // 将新的 simhash 添加到索引中
 
-		// 写入文件
-		ofs
-			<< "<doc><docid>" << idex + 1
-			<< "</docid><title>" << item._title
-			<< "</title><link>" << item._link
-			<< "</link><description>" << item._description
-			<< "</description><content>" << item._content << "</content></doc>";
-		ofs << '\n';
+		// 写入文件（对输出做 XML 转义以保证合法性）
+		ofs << "<doc><docid>" << (idex + 1) << "</docid>"
+			<< "<title>" << xml_escape(item._title) << "</title>"
+			<< "<link>" << xml_escape(item._link) << "</link>"
+			<< "<description>" << xml_escape(item._description) << "</description>"
+			<< "<content>" << xml_escape(item._content) << "</content></doc>" << '\n';
 
-		// 记录偏移量
-		offsetofs
-			<< start << " "
-			<< item._description.size() + start << " "; // 记录 docid、起始偏移量、结束偏移量
-		offsetofs << '\n';
+		// 记录偏移量（text.dat 使用原始 description，偏移基于原始长度）
+		offsetofs << start << " " << (item._description.size() + start) << '\n';
 
 		// 写入text
 		textofs << item._description << '\n';
 		start += item._description.size() + 1; // 更新起始偏移量
 		++idex;								   // 仅对非重复项递增索引
 	}
+	// 关闭根元素并关闭文件
+	ofs << "</root>" << '\n';
 	ofs.close();
 	offsetofs.close();
 	textofs.close();

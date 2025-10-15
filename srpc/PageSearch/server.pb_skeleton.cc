@@ -35,12 +35,14 @@ map<int, set<double>> getintersection(vector<pair<string, double>> &words_weight
 										 [&word](const pair<string, double> &p)
 										 { return p.first == word; }),
 							   words_weight.end());
+			cout << "word not found: " << word << endl;
 			continue; // 该词不在倒排索引中
 		}
 		const set<pair<int, double>> &docSet = it->second; // 包含该词的所有文档及其权重
 		for (const auto &doc : docSet)
 		{
 			result_set[doc.first].insert(doc.second);
+			printf("DocID: %d, Word: %s, Weight: %f\n", doc.first, word.c_str(), doc.second);
 		}
 	}
 	// 过滤出包含所有分词的文档
@@ -51,11 +53,14 @@ map<int, set<double>> getintersection(vector<pair<string, double>> &words_weight
 		if (entry.second.size() != required_count)
 		{
 			// 不包含所有分词，删除
+			printf("DocID %d does not contain all words, removing\n", docid);
 			result_set.erase(docid);
 		}
 	}
+	printf("Total documents containing all words: %zu\n", result_set.size());
 	return result_set;
 }
+
 double countnorm(const set<double> &weights)
 {
 	double norm = 0.0;
@@ -65,6 +70,7 @@ double countnorm(const set<double> &weights)
 	}
 	return sqrt(norm);
 }
+
 class PageSuggestServerServiceImpl : public PageSuggestServer::Service
 {
 public:
@@ -75,13 +81,33 @@ public:
 		printf("Received searchstring: %s\n", searchstring.c_str());
 
 		// 分词并且计算权重
-		vector<pair<string, double>> words_weight = cutweight.cut_weight(searchstring);
+		vector<pair<string, double>> words_weight = cutweight.cut_weight(searchstring, readPage.totalpage, readPage);
+		if (words_weight.empty())
+		{
+			response->set_code(2);
+			response->set_message("cut no valid words");
+			printf("cut no valid words: %s\n", searchstring.c_str());
+			return;
+		}
+		// 打印分词结果
+		printf("Words and weights:\n");
+		for (const auto &ww : words_weight)
+		{
+			printf("  Word: %s, Weight: %f\n", ww.first.c_str(), ww.second);
+		}
+		// 计算模长
 		double norm = cutweight.get_norm(); // 模长
 		printf("关键句的Norm: %f\n", norm);
 
 		// 查倒排索引，取出交集（包含所有分词的page）
 		map<int, set<double>> result_set = getintersection(words_weight);
-
+		if (result_set.empty())
+		{
+			response->set_code(2);
+			response->set_message("No results found");
+			printf("No results found for searchstring: %s\n", searchstring.c_str());
+			return;
+		}
 		// 计算内积大小并且排序
 		priority_queue<pair<double, int>> pq; // (inner_product, docid)priority_queue默认以pair的first降序排列
 		for (const auto &entry : result_set)
@@ -143,7 +169,7 @@ public:
 void timerCallback(WFTimerTask *timertask)
 {
 	agent::Agent *pagent = (agent::Agent *)timertask->user_data;
-	pagent->servicePass("PPageSuggestService1");
+	pagent->servicePass("PageSuggestService1");
 	WFTimerTask *nextTask = WFTaskFactory::create_timer_task(9, 0, timerCallback);
 	nextTask->user_data = pagent;
 	series_of(timertask)->push_back(nextTask);
@@ -152,7 +178,7 @@ void timerCallback(WFTimerTask *timertask)
 int main()
 {
 	GOOGLE_PROTOBUF_VERIFY_VERSION;
-	unsigned short port = 1501;
+	unsigned short port = 1600;
 	SRPCServer server;
 
 	PageSuggestServerServiceImpl pagesuggestserver_impl;
@@ -171,7 +197,7 @@ int main()
 	pagent = new agent::Agent(*pconsul);
 	pagent->registerService(
 		agent::kw::name = "PageSuggestService1",
-		agent::kw::id = "PPageSuggestService1",
+		agent::kw::id = "PageSuggestService1",
 		agent::kw::address = "127.0.0.1",
 		agent::kw::port = port,
 		agent::kw::check = agent::TtlCheck(std::chrono::seconds(10)));

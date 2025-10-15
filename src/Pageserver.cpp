@@ -1,33 +1,6 @@
 #include "../include/Pageserver.h"
 
-// URL解码函数
-std::string urlDecode(const std::string &encoded)
-{
-	std::string decoded;
-	for (size_t i = 0; i < encoded.size(); ++i)
-	{
-		if (encoded[i] == '%' && i + 2 < encoded.size())
-		{
-			// 解析%后面的两位十六进制数
-			char hex1 = encoded[i + 1];
-			char hex2 = encoded[i + 2];
-
-			int val = 0;
-			if (isxdigit(hex1) && isxdigit(hex2))
-			{
-				std::stringstream ss;
-				ss << std::hex << std::string(1, hex1) << std::string(1, hex2);
-				ss >> val;
-				decoded += static_cast<char>(val);
-				i += 2; // 跳过已经处理的两个字符
-				continue;
-			}
-		}
-		// 普通字符直接添加
-		decoded += encoded[i];
-	}
-	return decoded;
-}
+#include "../include/Utils.h"
 
 void pageSuggestCallback(RespPageSuggest *response, srpc::RPCContext *ctx, HttpResp *resp,
 						 ReqPageSuggest *word_suggest_req)
@@ -35,9 +8,31 @@ void pageSuggestCallback(RespPageSuggest *response, srpc::RPCContext *ctx, HttpR
 
 	if (response->code() == 0)
 	{
+		// 将 repeated backwords 字段组织为 JSON 返回给前端
+		json j;
+		j["code"] = 0;
+		j["message"] = response->message();
+		j["items"] = json::array();
+		for (int i = 0; i < response->itemproto_size(); ++i)
+		{
+			const auto &item = response->itemproto(i);
+
+			// 手动转换成 JSON 对象
+			json item_json = {
+				{"title", item.title()},
+				{"link", item.link()},
+				{"description", item.description()}};
+
+			j["items"].push_back(item_json);
+		}
+
+		resp->String(j.dump());
 	}
 	else
 	{
+		json j;
+		j["code"] = response->code();
+		j["message"] = response->message();
 	}
 
 	// 清理申请的资源
