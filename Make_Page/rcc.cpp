@@ -51,21 +51,18 @@ void RSS::read(const string &filename)
 		const char *title_c = safe_get_text(itemNode->FirstChildElement("title"));
 		const char *link_c = safe_get_text(itemNode->FirstChildElement("link"));
 		const char *desc_c = safe_get_text(itemNode->FirstChildElement("description"));
-		const char *cont_c = safe_get_text(itemNode->FirstChildElement("content:encoded"));
+		const char *content_c = safe_get_text(itemNode->FirstChildElement("content:encoded"));
 
-		if (!title_c)
+		if (!title_c || !link_c || !desc_c)
 		{
-			std::cerr << "RSS::read: item missing <title> in '" << filename << "' (item idx=" << idx << ")" << endl;
+			std::cerr << "RSS::read: missing title/link/description/ in item in '" << filename << "' (item idx=" << idx << ")" << endl;
+			itemNode = itemNode->NextSiblingElement("item");
+			continue;
 		}
-		if (!link_c)
-		{
-			std::cerr << "RSS::read: item missing <link> in '" << filename << "' (item idx=" << idx << ")" << endl;
-		}
-
 		string title = title_c ? string(title_c) : string();
 		string link = link_c ? string(link_c) : string();
 		string description = desc_c ? string(desc_c) : string();
-		string content = cont_c ? string(cont_c) : string();
+		string content = content_c ? string(content_c) : string();
 
 		std::regex reg("<[^>]*>"); // 通用正则表达式 <[^>]*>
 		description = regex_replace(description, reg, "");

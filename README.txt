@@ -17,51 +17,15 @@
 				细节：网页清洗
 					网页去重（simhasher）
 	2.在线部分：
+				用户输入分词并且计算权重
+				查倒排索引，取出交集（包含所有分词的page）
+				计算内积大小并且排序
 
-	========================
-	前端静态页面与 API 规范
-	========================
 
-	静态页面：static/index.html
-	直接在浏览器打开或由服务端映射为静态资源目录。
-
-	1) 关键词推荐 API
-		 方法:POST /api/suggest?q=<string>&n=<int>
-		 返回:
-		 {
-			 "code": 0,
-			 "msg": "ok",
-			 "data": {
-				 "query": "原始查询词",
-				 "suggestions": [
-					 { "word": "建议词", "freq": 123, "score": 0.87 }
-				 ]
-			 }
-		 }
-		 失败:
-		 { "code": 非0, "msg": "错误信息" }
-
-	2) 网页查询 API
-		 方法: POST /api/search?q=<string>&page=<int>&size=<int>
-		 返回:
-		 {
-			 "code": 0,
-			 "msg": "ok",
-			 "data": {
-				 "query": "原始查询词",
-				 "total": 100,
-				 "page": 1,
-				 "size": 10,
-				 "items": [
-					 { "title": "标题", "url": "https://...", "snippet": "摘要", "score": 0.92 }
-				 ]
-			 }
-		 }
-		 失败:
-		 { "code": 非0, "msg": "错误信息" }
-
-	返回 JSON 格式统一：UTF-8，无 BOM，Content-Type: application/json; charset=utf-8。
-
+关键技术：
+1.中英文分词原理
+2.simhasher文本相似度算法。网页去重
+3.
 
 
 

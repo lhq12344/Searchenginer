@@ -89,41 +89,42 @@ public:
 			printf("cut no valid words: %s\n", searchstring.c_str());
 			return;
 		}
-		// 打印分词结果
-		printf("Words and weights:\n");
-		for (const auto &ww : words_weight)
-		{
-			printf("  Word: %s, Weight: %f\n", ww.first.c_str(), ww.second);
-		}
+
 		// 计算模长
 		double norm = cutweight.get_norm(); // 模长
 		printf("关键句的Norm: %f\n", norm);
 
-		// 查倒排索引，取出交集（包含所有分词的page）
-		map<int, set<double>> result_set = getintersection(words_weight);
-		if (result_set.empty())
+		// 计算每个文档与查询的内积
+		unordered_map<int, double> inner_products; // docid -> 累加的内积
+		for (auto &[word, wq] : words_weight)
 		{
-			response->set_code(2);
-			response->set_message("No results found");
-			printf("No results found for searchstring: %s\n", searchstring.c_str());
-			return;
+			auto it = readPage.invertedIndex.find(word);
+			if (it == readPage.invertedIndex.end())
+				continue; // 词不在索引中
+
+			for (auto &[docid, wd] : it->second)
+			{
+				inner_products[docid] += wq * wd; // 按词累积内积
+			}
 		}
+
 		// 计算内积大小并且排序
 		priority_queue<pair<double, int>> pq; // (inner_product, docid)priority_queue默认以pair的first降序排列
-		for (const auto &entry : result_set)
+		for (auto &[docid, inner_product] : inner_products)
 		{
-			int docid = entry.first;
-			const set<double> &weights = entry.second;
-			double norm2 = countnorm(weights);
-			double inner_product = 0.0;
-			int index = 0;
-			for (double w : weights)
+			double norm2 = 0.0;
+			// 查找任意一个词，找到对应doc的权重，重算norm2
+			for (auto &[word, posting] : readPage.invertedIndex)
 			{
-				inner_product += w * words_weight[index].second; // 计算内积
-				index++;
+				for (auto &[d, w] : posting)
+				{
+					if (d == docid)
+						norm2 += w * w;
+				}
 			}
-			inner_product /= (norm * norm2); // 余弦相似度
-			pq.push({inner_product, docid});
+			norm2 = sqrt(norm2);
+			double sim = inner_product / (norm * norm2);
+			pq.push({sim, docid});
 		}
 
 		// 返回前10个结果

@@ -22,7 +22,6 @@ vector<pair<string, double>> CutWeight::cut_weight(const string &str, int N, Rea
 	for (const auto &word : words)
 		wordCount[word]++;
 
-	double norm = 0.0;
 	vector<double> weights;
 
 	for (const auto &kv : wordCount)
@@ -54,6 +53,7 @@ vector<pair<string, double>> CutWeight::cut_weight(const string &str, int N, Rea
 	}
 
 	norm = sqrt(norm);
+	cout << "计算得到的模长: " << norm << endl;
 	if (norm == 0)
 		norm = 1; // 避免除 0
 

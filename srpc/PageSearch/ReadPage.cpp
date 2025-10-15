@@ -231,16 +231,16 @@ bool ReadPage::ReadInvertedIndex(const std::string &indexPath)
 			  << " 个词，总计 " << invertedIndex.size() << " 个索引项。" << std::endl;
 
 	// 调试输出前5个词
-	// int debugCount = 0;
-	// for (auto &kv : invertedIndex)
-	// {
-	// 	if (debugCount++ >= 5)
-	// 		break;
-	// 	std::cout << "Word: [" << kv.first << "] → ";
-	// 	for (auto &p : kv.second)
-	// 		std::cout << "(" << p.first << ", " << p.second << ") ";
-	// 	std::cout << std::endl;
-	// }
+	int debugCount = 0;
+	for (auto &kv : invertedIndex)
+	{
+		if (debugCount++ >= 5)
+			break;
+		std::cout << "Word: [" << kv.first << "] → ";
+		for (auto &p : kv.second)
+			std::cout << "(" << p.first << ", " << p.second << ") ";
+		std::cout << std::endl;
+	}
 
 	return true;
 }

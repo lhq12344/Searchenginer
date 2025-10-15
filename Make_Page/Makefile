@@ -1,5 +1,5 @@
 CXX := g++
-CXXFLAGS := -std=c++17 -g -O2 -I.
+CXXFLAGS := -std=c++17 -g -O0 -I.
 LDFLAGS := -lstdc++fs
 
 SRCS := main.cpp MakePage.cpp rcc.cpp ../src/tinyxml2.cpp
