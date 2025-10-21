@@ -58,10 +58,9 @@ void SearchEngineServer::loadKeywordSearchModule()
 						series->push_back(consultask); });
 }
 
-// 占位：网页搜索模块的简单实现，避免链接时未定义符号
+// 网页搜索功能
 void SearchEngineServer::loadWebPageSearchModule()
 {
-	// 暂时不提供真实网页抓取/索引，只返回 501 给 web 请求（如果未来实现可替换）
 	_httpserver.POST("/api/search", [](const HttpReq *req, HttpResp *resp, SeriesWork *series)
 					 {
 						if (req->content_type() != APPLICATION_URLENCODED) {

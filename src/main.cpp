@@ -4,6 +4,6 @@ int main()
 {
 	SearchEngineServer server(1);
 	server.loadModules();
-	server.start(5678);
+	server.start(5679);
 	return 0;
 }
