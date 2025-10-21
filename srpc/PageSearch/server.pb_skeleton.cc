@@ -3,6 +3,7 @@
 #include "ReadPage.h"
 #include "cut_weight.h"
 #include <iostream>
+#include <shared_mutex>
 #include <ppconsul/ppconsul.h>
 
 using namespace srpc;
@@ -23,18 +24,17 @@ void sig_handler(int signo)
 map<int, set<double>> getintersection(vector<pair<string, double>> &words_weight)
 {
 	map<int, set<double>> result_set;
+	// 并发安全：加共享锁以保护对 readPage 的读取
+	std::shared_lock<std::shared_mutex> rlock(readPage.mtx);
+
+	// 不要在遍历时修改 words_weight；先建立过滤后的词表
+	vector<pair<string, double>> filtered;
 	for (const auto &word_weight : words_weight)
 	{
 		const string &word = word_weight.first;
-		double weight = word_weight.second;
 		auto it = readPage.invertedIndex.find(word);
 		if (it == readPage.invertedIndex.end())
 		{
-			// 删除这个分词   remove_if 会把所有需要删除的元素“移到末尾”；
-			words_weight.erase(remove_if(words_weight.begin(), words_weight.end(),
-										 [&word](const pair<string, double> &p)
-										 { return p.first == word; }),
-							   words_weight.end());
 			cout << "word not found: " << word << endl;
 			continue; // 该词不在倒排索引中
 		}
@@ -44,21 +44,27 @@ map<int, set<double>> getintersection(vector<pair<string, double>> &words_weight
 			result_set[doc.first].insert(doc.second);
 			printf("DocID: %d, Word: %s, Weight: %f\n", doc.first, word.c_str(), doc.second);
 		}
+		filtered.push_back(word_weight);
 	}
-	// 过滤出包含所有分词的文档
+
+	// 替换原始词表为过滤后的词表
+	words_weight.swap(filtered);
+
+	// 过滤出包含所有分词的文档；先收集需要保留的docid，避免在迭代时修改map
 	int required_count = words_weight.size();
+	vector<int> keep;
 	for (const auto &entry : result_set)
 	{
-		int docid = entry.first;
-		if (entry.second.size() != required_count)
-		{
-			// 不包含所有分词，删除
-			printf("DocID %d does not contain all words, removing\n", docid);
-			result_set.erase(docid);
-		}
+		if ((int)entry.second.size() == required_count)
+			keep.push_back(entry.first);
 	}
-	printf("Total documents containing all words: %zu\n", result_set.size());
-	return result_set;
+	map<int, set<double>> final_map;
+	for (int d : keep)
+	{
+		final_map[d] = std::move(result_set[d]);
+	}
+	printf("Total documents containing all words: %zu\n", final_map.size());
+	return final_map;
 }
 
 double countnorm(const set<double> &weights)
@@ -96,6 +102,8 @@ public:
 
 		// 计算每个文档与查询的内积
 		unordered_map<int, double> inner_products; // docid -> 累加的内积
+		// 加共享锁保护对 readPage 的多次读取
+		std::shared_lock<std::shared_mutex> rlock(readPage.mtx);
 		for (auto &[word, wq] : words_weight)
 		{
 			auto it = readPage.invertedIndex.find(word);

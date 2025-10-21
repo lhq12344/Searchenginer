@@ -1,8 +1,12 @@
 #include "ReadPage.h"
+#include <mutex>
+#include <shared_mutex>
 
 bool ReadPage::LoadPageAndOffset()
 {
 	int ret = 0;
+	// 独占写锁，保证加载/更新期间没有读取竞争
+	unique_lock<std::shared_mutex> wlock(mtx);
 	// 读取网页库文件
 	if (!ReadPageLib(PAGE_LIB_FILE))
 	{

@@ -76,6 +76,7 @@
 		"list": "cpp",
 		"filesystem": "cpp",
 		"bitset": "cpp",
-		"regex": "cpp"
+		"regex": "cpp",
+		"shared_mutex": "cpp"
 	}
 }

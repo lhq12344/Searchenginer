@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <set>
 #include <algorithm>
+#include <shared_mutex>
 
 using namespace std;
 using namespace tinyxml2;
@@ -42,6 +43,9 @@ public:
 
 	// 倒排索引
 	std::unordered_map<std::string, std::set<pair<int, double>>> invertedIndex;
+
+	// 读写锁：Load 时写入，运行时并发读取使用 shared_lock
+	mutable std::shared_mutex mtx;
 
 private:
 	// 读取网页库文件
