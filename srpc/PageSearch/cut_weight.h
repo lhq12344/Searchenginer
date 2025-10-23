@@ -1,7 +1,7 @@
 #ifndef CUT_WEIGHT_H
 #define CUT_WEIGHT_H
 
-#include "../include/cppjieba/Jieba.hpp"
+#include "../../include/cppjieba/Jieba.hpp"
 #include "ReadPage.h"
 #include <fstream>
 #include <iostream>
