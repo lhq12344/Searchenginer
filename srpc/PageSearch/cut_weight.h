@@ -1,7 +1,7 @@
 #ifndef CUT_WEIGHT_H
 #define CUT_WEIGHT_H
 
-#include "../include/cppjieba/Jieba.hpp"
+#include "../../include/cppjieba/Jieba.hpp"
 #include "ReadPage.h"
 #include <fstream>
 #include <iostream>
@@ -20,6 +20,7 @@ public:
 	~CutWeight() = default;
 	vector<pair<string, double>> cut_weight(const string &str, int N, ReadPage &readPage);
 	double get_norm() const { return norm; }
+	vector<string> cut(const string &line);
 
 private:
 	// jieba构造参数
@@ -29,6 +30,5 @@ private:
 						  "../../include/dict/idf.utf8",
 						  "../../include/dict/stop_words.utf8"};
 	double norm = 0.0; // 用于归一化
-	vector<string> cut(const string &line);
 };
 #endif // !CUT_WEIGHT_H

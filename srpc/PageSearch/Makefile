@@ -4,7 +4,7 @@ PKG_LIBS   := $(shell pkg-config --libs protobuf srpc wfrest 2>/dev/null)
 CXX ?= g++
 CXXFLAGS := -std=c++17 -O2 -g -Wall -I..
 LDFLAGS :=
-LDLIBS := $(if $(PKG_LIBS),$(PKG_LIBS),-lprotobuf -lsrpc -lwfrest -lworkflow -lssl -lcrypto -lpthread -lz -llz4 -lsnappy -lppconsul)
+LDLIBS := $(if $(PKG_LIBS),$(PKG_LIBS),-lprotobuf -lsrpc -lwfrest -lworkflow -lssl -lcrypto -lpthread -lz -llz4 -lsnappy -lppconsul -lfasttext -lfaiss -fopenmp -lopenblas -llapack)
 
 SRCS := $(wildcard *.cc)
 OBJS := $(SRCS:.cc=.o)

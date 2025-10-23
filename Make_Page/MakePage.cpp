@@ -214,3 +214,185 @@ void MakePage::makeinverseindex()
 	}
 	cout << "倒排索引创建完毕！" << endl;
 }
+
+// 创建训练文本文件
+void MakePage::makefasttextfile()
+{
+	// 读取文本库text.dat
+	std::ifstream ifs("page/text.dat");
+	if (!ifs)
+	{
+		std::cerr << "makefasttextfile: failed to open text.dat" << std::endl;
+		return;
+	}
+	std::ofstream ofs("page/fasttext.txt");
+	if (!ofs)
+	{
+		std::cerr << "makefasttextfile: failed to open fasttext.txt" << std::endl;
+		return;
+	}
+	std::string line;
+	while (std::getline(ifs, line))
+	{
+		// 处理每一行，进行分词等操作
+		std::vector<std::string> words = cut(line);
+		for (const auto &word : words)
+		{
+			ofs << word << " ";
+		}
+		ofs << std::endl;
+	}
+}
+
+void MakePage::makefasttextmodel()
+{
+	// 1) 加载 fastText 预训练词向量模型（可换为你的实际路径或通过环境变量覆盖）
+	fasttext::FastText model;
+	model.loadModel("./page/small_model.bin");
+	// 2) 读取 pagelib，准备导出文档向量
+	std::vector<Item> pages;
+	if (!ReadPageLibLocal("./page/pagelib.dat", pages))
+	{
+		std::cerr << "makefasttextmodel: failed to read pagelib locally." << std::endl;
+		return;
+	}
+	int N = static_cast<int>(pages.size());
+
+	//  维度：若使用 fastText 则取模型维度；否则取环境变量 VEC_DIM（默认 2048）
+	int32_t dim = static_cast<int32_t>(model.getDimension());
+	std::cout << "[fasttext] :" << " docs=" << N << " dim=" << dim << std::endl;
+	if (N <= 0 || N > 10000000)
+	{
+		std::cerr << "makefasttextmodel: abnormal totalpage=" << N << ", abort." << std::endl;
+		return;
+	}
+	// 3) 输出二进制向量文件：VEC1 + dim + nvec + (docid, vector[dim])*nvec
+	std::error_code ec;
+	std::filesystem::create_directories("page", ec);
+	std::ofstream ofs("page/vectors.dat", std::ios::binary);
+	if (!ofs)
+	{
+		std::cerr << "makefasttextmodel: cannot open page/vectors.dat for write" << std::endl;
+		return;
+	}
+	// 写头
+	const char magic[4] = {'V', 'E', 'C', '1'};
+	ofs.write(magic, 4);
+	int32_t nvec = static_cast<int32_t>(N);
+	// 向量数量
+	ofs.write(reinterpret_cast<const char *>(&dim), sizeof(int32_t));
+	ofs.write(reinterpret_cast<const char *>(&nvec), sizeof(int32_t));
+	// 4) 为每个文档构建向量：使用倒排索引中的 TF-IDF 权重对词向量加权 -> L2 归一化
+	// 读取倒排索引文件 page/inverseindex.dat，格式为：word \t docid1 weight1 docid2 weight2 ...
+	unordered_map<int, vector<pair<string, double>>> docWeights; // docid -> list of (word, weight)
+	{
+		std::ifstream invifs("page/inverseindex.dat");
+		if (invifs)
+		{
+			string line;
+			while (std::getline(invifs, line))
+			{
+				if (line.empty())
+					continue;
+				// 切分：词语 在第一个 \t 之前，后面是若干 "docid weight"
+				size_t tab = line.find('\t');
+				if (tab == string::npos)
+					continue;
+				string word = line.substr(0, tab);
+				string rest = line.substr(tab + 1);
+				std::istringstream iss(rest);
+				int docid;
+				double weight;
+				while (iss >> docid >> weight)
+				{
+					docWeights[docid].push_back({word, weight});
+				}
+			}
+		}
+		else
+		{
+			std::cerr << "makefasttextmodel: cannot open page/inverseindex.dat, will fallback to simple averaging" << std::endl;
+		}
+	}
+
+	fasttext::Vector wv(dim);
+	auto l2_normalize = [](std::vector<float> &v)
+	{
+		double s = 0.0;
+		for (float x : v)
+			s += double(x) * double(x);
+		if (s <= 0)
+			return;
+		float inv = 1.0f / static_cast<float>(std::sqrt(s));
+		for (auto &x : v)
+			x *= inv;
+	};
+
+	std::vector<float> accum(dim);
+	for (const auto &item : pages)
+	{
+		std::fill(accum.begin(), accum.end(), 0.f);
+		int docid = item.docid;
+		bool usedWeights = false;
+		auto it = docWeights.find(docid);
+		if (it != docWeights.end() && !it->second.empty())
+		{
+			usedWeights = true;
+			double totalWeight = 0.0;
+			for (const auto &p : it->second)
+				totalWeight += p.second > 0 ? p.second : 0.0;
+			if (totalWeight <= 0.0)
+				totalWeight = 1.0; // 防止除以零
+
+			for (const auto &p : it->second)
+			{
+				const string &w = p.first;
+				double wt = p.second;
+				if (wt <= 0)
+					continue;
+				model.getWordVector(wv, w);
+				for (int i = 0; i < dim; ++i)
+					accum[i] += static_cast<float>(wv[i] * (wt / totalWeight));
+			}
+		}
+		else
+		{
+			// fallback: simple average of word vectors (原有逻辑)
+			vector<string> words = cut(item.description);
+			int used = 0;
+			for (const auto &w : words)
+			{
+				if (w.empty())
+					continue;
+				model.getWordVector(wv, w);
+				for (int i = 0; i < dim; ++i)
+					accum[i] += wv[i];
+				++used;
+			}
+			if (used > 0)
+			{
+				float inv = 1.0f / static_cast<float>(used);
+				for (auto &x : accum)
+					x *= inv; // 平均
+			}
+			if (used == 0)
+			{
+				std::istringstream iss(item.description);
+				wv.zero();
+				model.getSentenceVector(iss, wv);
+				for (int i = 0; i < dim; ++i)
+					accum[i] = wv[i];
+			}
+		}
+
+		// L2 归一化
+		l2_normalize(accum);
+
+		// 写入：docid + 向量
+		int32_t docid32 = static_cast<int32_t>(item.docid);
+		ofs.write(reinterpret_cast<const char *>(&docid32), sizeof(int32_t));
+		ofs.write(reinterpret_cast<const char *>(accum.data()), sizeof(float) * dim);
+	}
+	ofs.flush();
+	std::cout << "[fasttext] vectors exported -> page/vectors.dat" << std::endl;
+}

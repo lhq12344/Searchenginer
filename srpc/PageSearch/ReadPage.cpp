@@ -1,8 +1,12 @@
 #include "ReadPage.h"
+#include <mutex>
+#include <shared_mutex>
 
 bool ReadPage::LoadPageAndOffset()
 {
 	int ret = 0;
+	// 独占写锁，保证加载/更新期间没有读取竞争
+	unique_lock<std::shared_mutex> wlock(mtx);
 	// 读取网页库文件
 	if (!ReadPageLib(PAGE_LIB_FILE))
 	{
@@ -242,5 +246,30 @@ bool ReadPage::ReadInvertedIndex(const std::string &indexPath)
 		std::cout << std::endl;
 	}
 
+	return true;
+}
+
+bool ReadPage::LoadVectors(const std::string &path, std::vector<VecEntry> &entries, int &dim)
+{
+	std::ifstream ifs(path, std::ios::binary);
+	if (!ifs)
+		return false;
+
+	char magic[4];
+	ifs.read(magic, 4);
+	if (strncmp(magic, "VEC1", 4) != 0)
+		return false;
+
+	int32_t nvec;
+	ifs.read(reinterpret_cast<char *>(&dim), sizeof(int32_t));
+	ifs.read(reinterpret_cast<char *>(&nvec), sizeof(int32_t));
+
+	entries.resize(nvec);
+	for (int i = 0; i < nvec; ++i)
+	{
+		entries[i].vec.resize(dim);
+		ifs.read(reinterpret_cast<char *>(&entries[i].docid), sizeof(int32_t));
+		ifs.read(reinterpret_cast<char *>(entries[i].vec.data()), sizeof(float) * dim);
+	}
 	return true;
 }

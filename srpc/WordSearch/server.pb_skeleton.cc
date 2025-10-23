@@ -2,6 +2,7 @@
 #include "workflow/WFFacilities.h"
 #include "ReadIndist.h"
 #include "SimilarityComparator.h"
+#include "Cache.h"
 #include <iostream>
 #include <ppconsul/ppconsul.h>
 
@@ -9,7 +10,8 @@ using namespace srpc;
 using namespace std;
 using namespace ppconsul;
 
-ReadIndist readindist; // 全局对象：读取词典和索引的类
+ReadIndist readindist;						// 全局对象：读取词典和索引的类
+MyLRUCache<string, string> textCache(1000); // LRU缓存，缓存网页内容，容量1000
 
 static WFFacilities::WaitGroup wait_group(1);
 
@@ -62,6 +64,21 @@ public:
 		// 获取用户请求
 		string searchword = request->searchword();
 		printf("Received searchword: %s\n", searchword.c_str());
+		// 判断命中缓存
+		auto cachedResult = textCache.get(searchword);
+		if (cachedResult.has_value())
+		{
+			printf("Cache hit for searchword: %s\n", searchword.c_str());
+			for (const auto &word : cachedResult.value())
+			{
+				response->add_backwords(word); // 添加到响应中
+				printf("Suggested word from cache: %s\n", word.c_str());
+			}
+			response->set_code(0);
+			response->set_message("success (from cache)");
+			return;
+		}
+		// 未命中缓存，继续处理
 		vector<pair<string, size_t>> words;
 		// 拆分字符
 		const int MAX_WINDOW = 3;
@@ -156,6 +173,8 @@ public:
 			if (count >= 10)
 				break;
 			response->add_backwords(kv.first); // 添加到响应中
+			// 加入缓存
+			textCache.put(searchword, kv.first);
 			printf("Suggested word: %s\n", kv.first.c_str());
 			count++;
 		}
