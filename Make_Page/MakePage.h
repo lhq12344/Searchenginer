@@ -11,6 +11,13 @@
 #include <unordered_map>
 #include <set>
 #include <filesystem>
+#if __has_include("fasttext.h")
+#include "fasttext.h"
+#elif __has_include(<fasttext/fasttext.h>)
+#include <fasttext/fasttext.h>
+#else
+#error "fastText headers not found. Please set FASTTEXT_INC or FASTTEXT_ROOT include paths."
+#endif
 
 using namespace std;
 
@@ -39,9 +46,10 @@ public:
 		totalpage = 0;
 	}
 
-	void makepage();		 // 创建网页库和偏移库
-	void makeinverseindex(); // 创建倒排索引
-
+	void makepage();		  // 创建网页库和偏移库
+	void makeinverseindex();  // 创建倒排索引
+	void makefasttextmodel(); // 创建 fasttext 模型
+	void makefasttextfile();  // 创建 fasttext 训练文本文件
 private:
 	// rcc构造参数
 	RSS rss{4000};

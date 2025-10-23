@@ -84,6 +84,10 @@ void RSS::read(const string &filename)
 // 写文件
 void RSS::store(const string &filename, const string &storeFile, const string &offsetFile)
 {
+	// debug: 打印对象状态，帮助定位潜在的未初始化或内存破坏
+	std::cerr << "[DEBUG] RSS::store this=" << (void *)this << " _rss.size=" << _rss.size()
+			  << " idex=" << idex << " start=" << start << " simhashIndex.size=" << simhashIndex.size() << std::endl;
+
 	ofstream ofs(filename);
 	if (!ofs)
 	{
@@ -141,7 +145,7 @@ void RSS::store(const string &filename, const string &storeFile, const string &o
 
 	for (const auto &item : _rss)
 	{
-		size_t topN = 10; // 取前 10 个关键词
+		size_t topN = 20; // 取前 20 个关键词
 		uint64_t u64 = 0;
 		// 如果 description 为空，则跳过 simhash 计算以避免 noisy failures
 		if (!item._description.empty())
@@ -158,7 +162,12 @@ void RSS::store(const string &filename, const string &storeFile, const string &o
 		{
 			continue; // 如果 description 为空，跳过该条目
 		}
-		// 检查 simhash 是否已经存在
+		// 检查 simhash 是否已经存在：先做快速的精确匹配，再做海明距离阈值检查
+		if (seenHashes.find(u64) != seenHashes.end())
+		{
+			continue; // 精确相等，视为重复
+		}
+
 		bool isDuplicate = false;
 		for (const auto &entry : simhashIndex)
 		{
@@ -170,9 +179,12 @@ void RSS::store(const string &filename, const string &storeFile, const string &o
 		}
 		if (isDuplicate)
 		{
-			continue; // 如果是重复项，跳过该条目
+			continue; // 如果是重复项（海明距离小于阈值），跳过该条目
 		}
+
+		// 接受该文档：记录到映射和快速集合中
 		simhashIndex[idex + 1] = u64; // 将新的 simhash 添加到索引中
+		seenHashes.insert(u64);
 
 		// 写入文件（对输出做 XML 转义以保证合法性）
 		ofs << "<doc><docid>" << (idex + 1) << "</docid>"

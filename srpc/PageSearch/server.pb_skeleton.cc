@@ -6,6 +6,7 @@
 #include <iostream>
 #include <shared_mutex>
 #include <ppconsul/ppconsul.h>
+#include <faiss/IndexIDMap.h>
 
 using namespace srpc;
 using namespace std;
@@ -21,6 +22,74 @@ static WFFacilities::WaitGroup wait_group(1);
 void sig_handler(int signo)
 {
 	wait_group.done();
+}
+
+// 计算关键词的向量表示（简单平均）
+std::vector<float> countwords(vector<string> &words, fasttext::FastText &model)
+{
+	int dim = static_cast<int>(model.getDimension());
+	std::vector<float> accum(dim, 0.f);
+	fasttext::Vector wv(dim);
+	int used = 0;
+	for (const auto &w : words)
+	{
+		if (w.empty())
+			continue;
+		model.getWordVector(wv, w);
+		// 累加
+		for (int i = 0; i < dim; ++i)
+			accum[i] += wv[i];
+		++used;
+	}
+	if (used > 0)
+	{
+		float inv = 1.0f / static_cast<float>(used);
+		for (auto &x : accum)
+			x *= inv; // 平均
+	}
+	// L2 归一化（FAISS 用内积时等价余弦）
+	double s = 0.0;
+	for (float x : accum)
+		s += double(x) * double(x);
+	if (s <= 0)
+		return std::vector<float>(dim, 0.f);
+	float inv = 1.0f / static_cast<float>(std::sqrt(s));
+	for (auto &x : accum)
+		x *= inv;
+
+	return accum;
+}
+
+// 使用 TF-IDF 权重计算查询向量：对词向量做加权求和并 L2 归一化
+std::vector<float> query_vector_tfidf(const std::vector<std::pair<std::string, double>> &words_weight,
+									  fasttext::FastText &model)
+{
+	int dim = static_cast<int>(model.getDimension());
+	std::vector<float> accum(dim, 0.f);
+	if (words_weight.empty())
+		return accum;
+	fasttext::Vector wv(dim);
+	for (const auto &p : words_weight)
+	{
+		const std::string &w = p.first;
+		double wt = p.second; // 已经在 cut_weight 中做了归一化
+		if (w.empty() || wt == 0.0)
+			continue;
+		model.getWordVector(wv, w);
+		for (int i = 0; i < dim; ++i)
+			accum[i] += static_cast<float>(wv[i] * wt);
+	}
+	// L2 归一化
+	double s = 0.0;
+	for (float x : accum)
+		s += double(x) * double(x);
+	if (s > 0)
+	{
+		float inv = 1.0f / static_cast<float>(std::sqrt(s));
+		for (auto &x : accum)
+			x *= inv;
+	}
+	return accum;
 }
 
 map<int, set<double>> getintersection(vector<pair<string, double>> &words_weight)
@@ -87,58 +156,43 @@ public:
 		// 获取用户请求
 		string searchstring = request->searchstring();
 		printf("Received searchstring: %s\n", searchstring.c_str());
-
-		// 分词并且计算权重
-		vector<pair<string, double>> words_weight = cutweight.cut_weight(searchstring, readPage.totalpage, readPage);
-		if (words_weight.empty())
+		// 先用 TF-IDF 计算查询词权重；若失败则回退到简单平均
+		std::vector<std::pair<std::string, double>> words_weight = cutweight.cut_weight(searchstring, readPage.totalpage, readPage);
+		std::vector<float> vector;
+		if (!words_weight.empty())
 		{
-			response->set_code(2);
-			response->set_message("cut no valid words");
-			printf("cut no valid words: %s\n", searchstring.c_str());
-			return;
+			vector = query_vector_tfidf(words_weight, readPage.model);
 		}
-
-		// 计算模长
-		double norm = cutweight.get_norm(); // 模长
-		printf("关键句的Norm: %f\n", norm);
-
-		// 计算每个文档与查询的内积
-		unordered_map<int, pair<double, double>> inner_products; // docid -> (累加的内积, 文档模长)
-		unordered_map<int, int> docid_set;						 // 记录docid的集合
-		int words_count = words_weight.size();
-		// 加共享锁保护对 readPage 的多次读取
-		std::shared_lock<std::shared_mutex> rlock(readPage.mtx);
-		for (auto &[word, wq] : words_weight)
+		else
 		{
-			auto it = readPage.invertedIndex.find(word);
-			if (it == readPage.invertedIndex.end())
-			{
-				words_count--;
-				continue; // 词不在索引中
-			}
-			for (auto &[docid, wd] : it->second)
-			{
-				inner_products[docid].first += wq * wd;	 // 按词累积内积
-				inner_products[docid].second += wd * wd; // 计算文档模长
-				docid_set[docid]++;
-			}
+			// fallback：只做分词 + 简单平均
+			std::vector<std::string> words = cutweight.cut(searchstring);
+			vector = countwords(words, readPage.model);
 		}
+		// 查询faiss索引
+		int topk = 10;					   // 查找最相似的前10篇文章
+		std::vector<faiss::idx_t> I(topk); // 存储结果索引
+		std::vector<float> D(topk);		   // 存储相似度得分
 
-		// 计算内积大小并且排序
-		priority_queue<pair<double, int>> pq; // (inner_product, docid)priority_queue默认以pair的first降序排列
-		for (const auto &entry : inner_products)
+		// 查询（第一个参数是查询向量数量，这里是1）
+		readPage.index->search(1, vector.data(), topk, D.data(), I.data());
+
+		// 输出结果
+		for (int i = 0; i < topk; ++i)
 		{
-			// 删除关键词数量过少的文档
-			int docid = entry.first;
-			if (docid_set[docid] < words_count) // 包含全部关键词
+			if (I[i] < 0)
+				continue; // -1 表示无结果
+			std::cout << "Rank " << i + 1 << ": docid=" << I[i]
+					  << "  similarity=" << D[i]
+					  << std::endl;
+		}
+		// 构建优先队列以排序结果
+		priority_queue<pair<double, int>> pq; // (similarity, docid)
+		for (int i = 0; i < topk; ++i)
+		{
+			if (I[i] < 0)
 				continue;
-			double inner_product = entry.second.first;
-			double norm2 = sqrt(entry.second.second);
-			// 计算余弦相似度
-			if (norm2 == 0 || norm == 0)
-				continue; // 避免除以零
-			double cosine_similarity = inner_product / (norm * norm2);
-			pq.push({cosine_similarity, docid});
+			pq.push({D[i], static_cast<int>(I[i])});
 		}
 
 		// 返回前10个结果
@@ -220,6 +274,34 @@ int main()
 		cerr << "Failed to load page." << endl;
 		return -1;
 	}
+	// 加载fastText模型
+	readPage.model.loadModel("../../Make_Page/page/small_model.bin");
+	// 加载fastText向量
+	std::vector<VecEntry> entries;
+	int dim = 0;
+	if (!readPage.LoadVectors("../../Make_Page/page/vectors.dat", entries, dim))
+	{
+		std::cerr << "Failed to load vectors.dat\n";
+		return -1;
+	}
+
+	// Build IndexFlatIP and wrap with IndexIDMap so search returns original docids
+	faiss::IndexFlatIP *flat = new faiss::IndexFlatIP(dim);
+	faiss::IndexIDMap *idmap = new faiss::IndexIDMap(flat);
+	// flatten vectors into a single array and collect ids
+	std::vector<float> allvecs;
+	allvecs.reserve((size_t)entries.size() * dim);
+	std::vector<faiss::idx_t> ids;
+	ids.reserve(entries.size());
+	for (const auto &e : entries)
+	{
+		allvecs.insert(allvecs.end(), e.vec.begin(), e.vec.end());
+		ids.push_back(static_cast<faiss::idx_t>(e.docid));
+	}
+	idmap->add_with_ids(entries.size(), allvecs.data(), ids.data());
+	readPage.index = idmap;
+
+	std::cout << "FAISS index built: dim=" << dim << " n=" << entries.size() << std::endl;
 	//  向consul注册服务（受保护，避免未捕获异常导致进程中止）
 	agent::Agent *pagent = nullptr;
 	Consul *pconsul = nullptr; // keep consul alive for the lifetime of agent

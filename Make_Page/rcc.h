@@ -5,6 +5,8 @@
 #include <regex>
 #include <vector>
 #include <fstream>
+#include <unordered_map>
+#include <unordered_set>
 
 using std::cout;
 using std::endl;
@@ -44,4 +46,5 @@ private:
 
 	size_t start = 0;
 	unordered_map<int, uint64_t> simhashIndex; //  文档 ID 列表 -> simhash 值
+	unordered_set<uint64_t> seenHashes;		   //  快速查重的哈希集合
 };

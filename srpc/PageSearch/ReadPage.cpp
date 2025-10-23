@@ -248,3 +248,28 @@ bool ReadPage::ReadInvertedIndex(const std::string &indexPath)
 
 	return true;
 }
+
+bool ReadPage::LoadVectors(const std::string &path, std::vector<VecEntry> &entries, int &dim)
+{
+	std::ifstream ifs(path, std::ios::binary);
+	if (!ifs)
+		return false;
+
+	char magic[4];
+	ifs.read(magic, 4);
+	if (strncmp(magic, "VEC1", 4) != 0)
+		return false;
+
+	int32_t nvec;
+	ifs.read(reinterpret_cast<char *>(&dim), sizeof(int32_t));
+	ifs.read(reinterpret_cast<char *>(&nvec), sizeof(int32_t));
+
+	entries.resize(nvec);
+	for (int i = 0; i < nvec; ++i)
+	{
+		entries[i].vec.resize(dim);
+		ifs.read(reinterpret_cast<char *>(&entries[i].docid), sizeof(int32_t));
+		ifs.read(reinterpret_cast<char *>(entries[i].vec.data()), sizeof(float) * dim);
+	}
+	return true;
+}
